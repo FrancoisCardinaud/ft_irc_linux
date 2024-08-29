@@ -26,6 +26,11 @@ void CommandExecutor::executeCommand(int clientFd, const Command& cmd) {
         return;
     }
 
+    if (command == "CAP") {
+        executeCap(clientFd);
+        return;
+    }
+
     if (command == "PASS") {
         executePass(clientFd, cmd);
         return;
@@ -778,4 +783,7 @@ void CommandExecutor::executePing(int clientFd, const Command& cmd){
      sendReply(clientFd, "PONG "+ _server.getServerName());
 }
 
+void CommandExecutor::executeCap(int clientFd){
 
+     sendReply(clientFd, "CAP * LS");
+}
