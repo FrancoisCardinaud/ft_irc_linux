@@ -21,6 +21,11 @@ void CommandExecutor::executeCommand(int clientFd, const Command& cmd) {
         return;
     }
 
+    if (command == "PING") {
+        executePing(clientFd, cmd);
+        return;
+    }
+
     if (command == "PASS") {
         executePass(clientFd, cmd);
         return;
@@ -148,7 +153,9 @@ void CommandExecutor::executeUser(int clientFd, const Command& cmd) {
     }
 
     std::string username = cmd.getParameters()[0];
-    std::string realname = cmd.getParameters()[3];
+    //std::string realname = cmd.getParameters()[3];
+    std::string realname = (cmd.getParameters()[3][0] == ':' ? cmd.getParameters()[3].substr(1) : cmd.getParameters()[3]);
+
 
     client->setUsername(username);
     client->setRealname(realname);
@@ -224,11 +231,12 @@ void CommandExecutor::executeJoin(int clientFd, const Command& cmd) {
 
     // Send channel topic
     std::string topic = channel->getTopic();
+    std::string prefix = channel->isOperator(client) ? "@" : "";
     if (!topic.empty()) {
-        sendReply(clientFd, "[332] " + client->getNickname() + " " + channelName + " :" + topic);
+        sendReply(clientFd, "[332] " + prefix + client->getNickname() + " " + channelName + " :" + topic);
     } 
     else {
-        sendReply(clientFd, "[331] " + client->getNickname() + " " + channelName + " :No topic is set");
+        sendReply(clientFd, "[331] " + prefix + client->getNickname() + " " + channelName + " :No topic is set");
     }
 
     
@@ -264,22 +272,28 @@ void CommandExecutor::executePrivmsg(int clientFd, const Command& cmd) {
     Client* sender = _server.getClientByFd(clientFd);
 
     
-    if (target[0] == '#') {
+    if (isChannelSyntaxOk(target)) {
         // Check if the channel name is valid
         if (!isValidChannelName(target)) {
         sendReply(clientFd, "[403] " + target + " :No such channel");
          Logger::debug("Sent [403] 'No such channel' reply");
         return;
         }
-        // Channel message
-        // TODO: Implement channel messaging
-        // Check if channel exists, if user is in channel, if user can speak in channel
+        Channel *channel = _server.getChannel(target);
+        if (!channel->isMember(sender)){
+            sendReply(clientFd, "[404] " + target + " ::Cannot send to channel");
+         Logger::debug("Client in not a member of channel.Sent [404] ':Cannot send to channel'");
+        }
+        Logger::info("client is sending message to channel...");
+        std::string prefix = channel->isOperator(sender) ? "@" : "";
+        std::string channelMessage =  ":" + sender->getFullClientIdentifier() + " PRIVMSG " + prefix + target + " :" + message;
+        _server.broadcastToChannel(target, channelMessage);
     } else {
         Client* recipient = _server.getClientByNickname(target);
         Logger::info("targer: "+target + "| client: "+ recipient->getNickname());
         if (recipient) {
             sendReply(recipient->getFd(), ":" + sender->getFullClientIdentifier() + " PRIVMSG " + target + " :" + message);
-        } else { //?
+        } else { 
             sendReply(clientFd, "[401] " + sender->getNickname() + " " + target + " :No such nick/channel");
         }
     }
@@ -325,6 +339,8 @@ void CommandExecutor::sendReply(int clientFd, const std::string& reply) const {
 
 void CommandExecutor::executeMode(int clientFd, const Command& cmd) {
     Logger::info("A");
+
+
     if (cmd.getParameters().size() < 2 || cmd.getParameters().size() > 3) {
         sendReply(clientFd, "[461] MODE :Not enough parameters");
         return;
@@ -722,8 +738,12 @@ bool CommandExecutor::isValidChannelName(const std::string& channelName) {
         return false;
     }
 
-    // Check if the first character is valid
-    if (channelName[0] != '&' && channelName[0] != '#' && channelName[0] != '+' && channelName[0] != '!') {
+    // // Check if the first character is valid
+    // if (channelName[0] != '&' && channelName[0] != '#' && channelName[0] != '+' && channelName[0] != '!') {
+    //     return false;
+    // }
+    
+    if (!isChannelSyntaxOk(channelName)){
         return false;
     }
 
@@ -736,4 +756,26 @@ bool CommandExecutor::isValidChannelName(const std::string& channelName) {
     }
     return true;
 }
+
+bool CommandExecutor::isChannelSyntaxOk(const std::string& channelName){
+    if (channelName[0] != '&' && channelName[0] != '#' && channelName[0] != '+' && channelName[0] != '!') {
+        return false;
+    }
+    return true;
+}
+
+
+void CommandExecutor::executePing(int clientFd, const Command& cmd){
+
+    if (cmd.getParameters().size() < 1) {
+        sendReply(clientFd, "[461] PING :Not enough parameters");
+        return;
+    }
+    if (cmd.getParameters()[0] != _server.getServerName()){
+        sendReply(clientFd, "[402] PING "+ cmd.getParameters()[0] +" :No such server");
+        return;
+    }
+     sendReply(clientFd, "PONG "+ _server.getServerName());
+}
+
 

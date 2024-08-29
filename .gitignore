@@ -1,0 +1,15 @@
+# Compiled Object files
+*.o
+
+# Log files
+*.log
+# Script files
+*.sh
+# Ignore  folder and subfolders
+/docs/architecture/
+/obj/
+# Visual Studio specific files
+.vscode/
+*.code-workspace
+.vs/
+.vscode/
