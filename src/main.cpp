@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
 per far partire il server
 esempio:
 
-./ircserver 10 psw
+./ircserv 8080 psw
 
 client:
 nc localhost 10
